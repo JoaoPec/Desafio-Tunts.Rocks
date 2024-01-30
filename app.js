@@ -19,6 +19,7 @@ app.get("/", async (req, res) => {
         let situationPosition = 4;
         let finalGradePosition = 4;
 
+
         for (let i = 0; i < rows.length; i++) {
             const matricula = rows[i][0];
             const aluno = rows[i][1];
@@ -31,27 +32,42 @@ app.get("/", async (req, res) => {
             let finalGrade = 0;
             let naf;
 
-            const media = (p1 + p2 + p3) / 3;
+
+            const media =  Math.ceil((p1 + p2 + p3) / 3);
+
 
             if (faltas > 15) {
                 situation = "Reprovado por Falta";
-            } else if (media >= 7) {
+                naf = 0;
+            } else if (media >= 70) {
                 situation = "Aprovado";
                 naf = 0;
-            } else if (5 <= media && media < 7) {
+            } else if (50 <= media && media < 70) {
+                console.log("Exame Final");
                 situation = "Exame Final";
                 naf = Math.ceil(2 * (5 - media));
-            } else {
+
+            } else if (media < 50) {
                 situation = "Reprovado por Nota";
                 naf = 0;
             }
 
+
+            finalGrade = calculateFinalGrade(media, naf);
+
             // Atualiza a situação na planilha
             await updateSituation(situation, situationPosition);
 
+            console.log()
+
             // Calcula a nota final e atualiza na planilha
-            finalGrade = calculateFinalGrade(media, naf);
-            await updateFinalGrade(finalGrade, finalGradePosition);
+            if (naf == 0) {
+                finalGrade = 0;
+                await updateFinalGrade(finalGrade, finalGradePosition);
+            } else {
+                finalGrade = calculateFinalGrade(media, naf);
+                await updateFinalGrade(finalGrade, finalGradePosition);
+            }
 
             // Incrementa as posições
             situationPosition++;
@@ -64,11 +80,15 @@ app.get("/", async (req, res) => {
                 p1,
                 p2,
                 p3,
+                media,
                 situation,
                 finalGrade,
             });
         }
 
+        console.log(alunos)
+
+        res.json(alunos);
 
     } catch (err) {
         console.log(err);
@@ -76,67 +96,64 @@ app.get("/", async (req, res) => {
     }
 
 
-        res.json(alunos);
 });
 
 async function getRows() {
-    try{
+    try {
 
-    const metaData = await googleSheets.spreadsheets.values.get({
-        auth: googleClient,
-        spreadsheetId,
-        range: `${sheet}!A4:H27`
-    });
+        const metaData = await googleSheets.spreadsheets.values.get({
+            auth: googleClient,
+            spreadsheetId,
+            range: `${sheet}!A4:H35`
+        });
 
-    return metaData.data.values;
+        return metaData.data.values;
 
-    }catch(err){
+    } catch (err) {
         console.log(err);
         return [];
     }
 }
 
 async function updateSituation(value, row) {
-try {
-    const updateSituation = await googleSheets.spreadsheets.values.update({
-        auth: googleClient,
-        spreadsheetId,
-        range: `${sheet}!G${row}`,
-        valueInputOption: "USER_ENTERED",
-        resource: {
-            values: [[value]]
-        }
-    });
-
-    console.log(updateSituation.data);
-
-}catch(err){
-    console.log(err);
-}
-
-}
-
-async function updateFinalGrade(value,row){
     try {
-        const updateFinalGrade = await googleSheets.spreadsheets.values.update({
+        const updateSituation = await googleSheets.spreadsheets.values.update({
             auth: googleClient,
             spreadsheetId,
-            range: `${sheet}H!${row}`,
+            range: `${sheet}!G${row}`,
             valueInputOption: "USER_ENTERED",
             resource: {
                 values: [[value]]
             }
         });
 
-        console.log(updateFinalGrade.data);
 
-    }catch(err){
+    } catch (err) {
+        console.log(err);
+    }
+
+}
+
+async function updateFinalGrade(value, row) {
+    try {
+        const updateFinalGrade = await googleSheets.spreadsheets.values.update({
+            auth: googleClient,
+            spreadsheetId,
+            range: `${sheet}!H${row}`,
+            valueInputOption: "USER_ENTERED",
+            resource: {
+                values: [[value]]
+            }
+        });
+
+
+    } catch (err) {
         console.log(err);
     }
 }
 
 function calculateFinalGrade(media, naf) {
-    return Math.ceil((media + naf) / 2);
+    return (Math.ceil((media + naf) / 2)) * -1;
 }
 
 
