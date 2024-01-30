@@ -14,6 +14,7 @@ Two routes are defined: / and /json.
 
 # Usage:
 
+- Run npm install
 - Run the application using node app.js.
 - Wait for the completion of the function.
 - Access the Google Sheets document by visiting http://localhost:3000/.
