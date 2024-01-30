@@ -1,17 +1,13 @@
 import express from 'express';
 import { google } from 'googleapis';
-import { getGoogleClient, getGoogleSheetsClient, getSpreadsheetId } from './config/googleConfig.js';
+import { getRows, updateSituation, updateFinalGrade, calculateFinalGrade } from './functions.js';
 
 const app = express();
 
-const sheet = "engenharia_de_software";
+async function updateSheet() {
 
-// Declarando variáveis fora das funções
-const googleClient = await getGoogleClient();
-const googleSheets = await getGoogleSheetsClient(googleClient);
-const spreadsheetId = await getSpreadsheetId();
+    console.log("Updating sheet...")
 
-app.get("/", async (req, res) => {
     try {
         const rows = await getRows("engenharia_de_software");
 
@@ -33,7 +29,7 @@ app.get("/", async (req, res) => {
             let naf;
 
 
-            const media =  Math.ceil((p1 + p2 + p3) / 3);
+            const media = Math.ceil((p1 + p2 + p3) / 3);
 
 
             if (faltas > 15) {
@@ -43,7 +39,6 @@ app.get("/", async (req, res) => {
                 situation = "Aprovado";
                 naf = 0;
             } else if (50 <= media && media < 70) {
-                console.log("Exame Final");
                 situation = "Exame Final";
                 naf = Math.ceil(2 * (5 - media));
 
@@ -58,7 +53,8 @@ app.get("/", async (req, res) => {
             // Atualiza a situação na planilha
             await updateSituation(situation, situationPosition);
 
-            console.log()
+            console.log(`Aluno: ${aluno} - Situação: ${situation} - media: ${media} - Nota para aprovação Final: ${finalGrade}`)
+
 
             // Calcula a nota final e atualiza na planilha
             if (naf == 0) {
@@ -86,78 +82,26 @@ app.get("/", async (req, res) => {
             });
         }
 
-        console.log(alunos)
-
-        res.json(alunos);
+        return (alunos);
 
     } catch (err) {
         console.log(err);
         res.json([]);
     }
+}
+
+const students = await updateSheet();
 
 
+app.get("/", async (req, res) => {
+    res.redirect("https://docs.google.com/spreadsheets/d/15Y_fvNQo8cBjvlRablHkW8boldKX5MbkOqRBd4ldC2k/edit#gid=0")
 });
 
-async function getRows() {
-    try {
+app.get("/json", async (req, res) => {
+    res.json(students)
+})
 
-        const metaData = await googleSheets.spreadsheets.values.get({
-            auth: googleClient,
-            spreadsheetId,
-            range: `${sheet}!A4:H35`
-        });
-
-        return metaData.data.values;
-
-    } catch (err) {
-        console.log(err);
-        return [];
-    }
-}
-
-async function updateSituation(value, row) {
-    try {
-        const updateSituation = await googleSheets.spreadsheets.values.update({
-            auth: googleClient,
-            spreadsheetId,
-            range: `${sheet}!G${row}`,
-            valueInputOption: "USER_ENTERED",
-            resource: {
-                values: [[value]]
-            }
-        });
-
-
-    } catch (err) {
-        console.log(err);
-    }
-
-}
-
-async function updateFinalGrade(value, row) {
-    try {
-        const updateFinalGrade = await googleSheets.spreadsheets.values.update({
-            auth: googleClient,
-            spreadsheetId,
-            range: `${sheet}!H${row}`,
-            valueInputOption: "USER_ENTERED",
-            resource: {
-                values: [[value]]
-            }
-        });
-
-
-    } catch (err) {
-        console.log(err);
-    }
-}
-
-function calculateFinalGrade(media, naf) {
-    return (Math.ceil((media + naf) / 2)) * -1;
-}
-
-
-app.listen("3000", () => {
-    console.log("Server started on port 3000");
+app.listen("3000", (req, res) => {
+    console.log("If you want to see the JSON of the students, access http://localhost:3000/json, and to see the spreadsheet, access http://localhost:3000/");
 });
 
