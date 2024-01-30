@@ -10,6 +10,7 @@ The updateSheet function is responsible for processing data from the Google Shee
 Two routes are defined: / and /json.
 
 / redirects users to the Google Sheets document for manual inspection.
+
 /json returns a JSON representation of the processed student data.
 
 # Usage:
