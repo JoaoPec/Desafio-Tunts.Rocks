@@ -1,88 +1,93 @@
 import express from 'express';
-import { google } from 'googleapis';
 import { getRows, updateSituation, updateFinalGrade, calculateFinalGrade } from './functions.js';
 
 const app = express();
 
+// Fetch, process, and update student data in the Google Sheets document
 async function updateSheet() {
 
-    console.log("Updating sheet...")
+    console.log("Updating sheet...");
 
     try {
-        const rows = await getRows("engenharia_de_software");
+        // Fetch rows from the Google Sheets
+        const rows = await getRows();
 
-        let alunos = [];
+        let students = [];
         let situationPosition = 4;
         let finalGradePosition = 4;
 
-
+        // Iterate through each row
         for (let i = 0; i < rows.length; i++) {
-            const matricula = rows[i][0];
-            const aluno = rows[i][1];
-            const faltas = parseInt(rows[i][2], 10);
-            const p1 = parseInt(rows[i][3], 10);
-            const p2 = parseInt(rows[i][4], 10);
-            const p3 = parseInt(rows[i][5], 10);
+            const enrollment = rows[i][0];
+            const student = rows[i][1];
+            const absences = parseInt(rows[i][2], 10);
+            const exam1 = parseInt(rows[i][3], 10);
+            const exam2 = parseInt(rows[i][4], 10);
+            const exam3 = parseInt(rows[i][5], 10);
 
             let situation = "";
             let finalGrade = 0;
             let naf;
 
+            // Calculate the average
+            const average = Math.ceil((exam1 + exam2 + exam3) / 3);
 
-            const media = Math.ceil((p1 + p2 + p3) / 3);
-
-
-            if (faltas > 15) {
+            // Determine the situation and naf value
+            if (absences > 15) {
                 situation = "Reprovado por Falta";
                 naf = 0;
-            } else if (media >= 70) {
+            } else if (average >= 70) {
                 situation = "Aprovado";
                 naf = 0;
-            } else if (50 <= media && media < 70) {
+            } else if (50 <= average && average < 70) {
                 situation = "Exame Final";
-                naf = Math.ceil(2 * (5 - media));
-
-            } else if (media < 50) {
-                situation = "Reprovado por Nota";
+                naf = Math.ceil(2 * (5 - average));
+            } else if (average < 50) {
+                situation = "Reprovado por nota";
                 naf = 0;
             }
 
+            // Calculate the final grade
+            finalGrade = calculateFinalGrade(average, naf);
 
-            finalGrade = calculateFinalGrade(media, naf);
-
-            // Atualiza a situação na planilha
+            // Update the situation in the spreadsheet
             await updateSituation(situation, situationPosition);
 
-            console.log(`Aluno: ${aluno} - Situação: ${situation} - media: ${media} - Nota para aprovação Final: ${finalGrade}`)
+            // Log details based on naf value
+            if (naf !== 0) {
+                console.log(`Aluno: ${student} - Situação: ${situation} - media: ${average} - Nota para Aprovação Final: ${finalGrade}`);
+            } else {
+                console.log(`Aluno: ${student} - Situação: ${situation} - media: ${average}`);
+            }
 
-
-            // Calcula a nota final e atualiza na planilha
+            // Calculate the final grade and update in the spreadsheet
             if (naf == 0) {
                 finalGrade = 0;
                 await updateFinalGrade(finalGrade, finalGradePosition);
             } else {
-                finalGrade = calculateFinalGrade(media, naf);
+                finalGrade = calculateFinalGrade(average, naf);
                 await updateFinalGrade(finalGrade, finalGradePosition);
             }
 
-            // Incrementa as posições
+            // Increment positions
             situationPosition++;
             finalGradePosition++;
 
-            alunos.push({
-                matricula,
-                aluno,
-                faltas,
-                p1,
-                p2,
-                p3,
-                media,
+            // Push student details to the array
+            students.push({
+                enrollment,
+                student,
+                absences,
+                exam1,
+                exam2,
+                exam3,
+                average,
                 situation,
                 finalGrade,
             });
         }
 
-        return (alunos);
+        return students;
 
     } catch (err) {
         console.log(err);
@@ -92,16 +97,19 @@ async function updateSheet() {
 
 const students = await updateSheet();
 
+// Define routes
 
 app.get("/", async (req, res) => {
-    res.redirect("https://docs.google.com/spreadsheets/d/15Y_fvNQo8cBjvlRablHkW8boldKX5MbkOqRBd4ldC2k/edit#gid=0")
+    // Redirect to the Google Sheets document
+    res.redirect("https://docs.google.com/spreadsheets/d/15Y_fvNQo8cBjvlRablHkW8boldKX5MbkOqRBd4ldC2k/edit#gid=0");
 });
 
 app.get("/json", async (req, res) => {
-    res.json(students)
-})
-
-app.listen("3000", (req, res) => {
-    console.log("If you want to see the JSON of the students, access http://localhost:3000/json, and to see the spreadsheet, access http://localhost:3000/");
+    // Return JSON representation of students
+    res.json(students);
 });
 
+app.listen("3000", (req, res) => {
+    // Log server start message
+    console.log("\nIf you want to see the JSON of the students, access http://localhost:3000/json\nAnd to see the spreadsheet, access http://localhost:3000/");
+});
